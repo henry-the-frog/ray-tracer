@@ -2,115 +2,127 @@
 
 A ray tracer built from scratch in JavaScript — no dependencies, runs in the browser and Node.js.
 
-## [▶ Try it live →](https://henry-the-frog.github.io/ray-tracer/)
+**[▶ Try it live →](https://henry-the-frog.github.io/ray-tracer/)** • **[Gallery](https://henry-the-frog.github.io/ray-tracer/gallery.html)**
 
 ## Features
 
-### Geometry
-- **Sphere** — Standard ray-sphere intersection
-- **Plane** — Infinite planes for ground, walls
-- **Rectangles** — XY, XZ, YZ axis-aligned finite planes
-- **Box** — Composed of 6 rectangles
-- **Triangle** — Möller-Trumbore intersection algorithm
-- **Mesh** — OBJ file loader with automatic BVH acceleration
+### Geometry (11 types)
+| Primitive | Description |
+|-----------|-------------|
+| Sphere | Standard ray-sphere intersection with UV mapping |
+| MovingSphere | Linear interpolation for motion blur |
+| Plane | Infinite planes for ground, walls |
+| XYRect, XZRect, YZRect | Axis-aligned finite rectangles |
+| Box | 6 rectangles forming an axis-aligned box |
+| Triangle | Möller-Trumbore intersection |
+| Mesh | OBJ loader with automatic BVH |
+| Disk | Flat circle |
+| Cylinder | Bounded y-axis cylinder |
+| Cone | Tapered cone |
 
-### Materials
-- **Lambertian** — Matte/diffuse with texture support
-- **Metal** — Reflective with configurable fuzz (0 = mirror, 1 = brushed)
-- **Dielectric** — Glass/water with Snell's law refraction + Schlick's approximation
-- **DiffuseLight** — Emissive material for area lights
+### Materials (7 types)
+| Material | Description |
+|----------|-------------|
+| Lambertian | Matte/diffuse, supports textures |
+| Metal | Reflective with configurable fuzz (0=mirror, 1=brushed) |
+| Dielectric | Glass/water — Snell's law + Schlick's approximation |
+| ColoredGlass | Beer-Lambert absorption for tinted glass (ruby, sapphire) |
+| DiffuseLight | Emissive for area lights |
+| Isotropic | Random-direction scatter for volumetric fog/smoke |
 
-### Textures
-- **SolidColor** — Constant color
-- **CheckerTexture** — 3D procedural checker pattern
-- **GradientTexture** — Y-axis gradient between two colors
-- **NoiseTexture** — Value noise with turbulence
-- **MarbleTexture** — Marble-like using noise
+### Textures (8 procedural)
+Solid, Checker, Gradient, Noise (value noise + turbulence), Marble, Stripe, Planet (continents + oceans + clouds)
 
 ### Rendering
-- **BVH acceleration** — Bounding Volume Hierarchy for O(log n) intersection (2.5x speedup)
-- **Multi-worker rendering** — Tile-based parallel rendering using Web Workers (uses all CPU cores)
-- **Anti-aliasing** — Multi-sample per pixel with random jitter
-- **Depth of field** — Configurable aperture and focus distance
-- **Gamma correction** — sqrt-based gamma 2 correction
-- **Progressive rendering** — See the image build up in real-time
+- **BVH acceleration** — O(log n) intersection, 2.5x speedup
+- **Multi-worker rendering** — tile-based parallel rendering using Web Workers
+- **Iterative ray tracing** — 1.57x faster than recursive (eliminates stack overhead)
+- **Motion blur** — time-parameterized rays, camera shutter
+- **Volumetric fog/smoke** — constant density medium
+- **Depth of field** — configurable aperture and focus distance
+- **Anti-aliasing** — multi-sample per pixel
+- **Gamma correction** — sqrt-based gamma 2
 
-### Scenes (6 built-in)
-1. **Three Spheres** — Glass, matte, and metal side by side
-2. **Random Scene** — ~480 randomly placed spheres with checker ground
-3. **Cornell Box** — Classic rendering test with area light and boxes
-4. **Glass Study** — Hollow glass, water, diamond spheres
-5. **Metal Showcase** — Five metals with increasing fuzziness
-6. **Lit Room** — Area light + checker floor
+### Post-Processing
+- **Bilateral filter denoiser** — edge-preserving noise reduction (3 presets)
+- **Tone mapping** — Reinhard and ACES filmic
+- **Exposure adjustment**
+
+### Interactive Features
+- **Camera orbit** — drag to rotate around look-at point
+- **Scroll zoom** — mouse wheel to zoom in/out
+- **PNG download** — save rendered images
+- **Render presets** — preview/draft/quality/production
+- **Debug modes** — normal map, depth map, flat shading
+
+### Advanced
+- **CSG** — Constructive Solid Geometry (union, intersection, difference)
+- **Transforms** — Translate + RotateY
+- **Environment maps** — Sky gradient, sunset, starfield
+- **JSON scene format** — import/export scenes
+- **OBJ mesh loader** — standard .obj file support
+
+### Scenes (14 built-in)
+Three Spheres, Random Scene, Cornell Box, Glass Study, Metal Showcase, Lit Room, Textured World, Smoky Cornell Box, Solar System, Showcase, Motion Blur, Final Scene, Museum, Sunset
 
 ## Quick Start
 
 ### Browser
-Visit the **[live demo](https://henry-the-frog.github.io/ray-tracer/)** or open `web/index.html` locally.
+Visit the **[live demo](https://henry-the-frog.github.io/ray-tracer/)** or open `web/index.html`.
 
 ### Node.js
 ```bash
-# Quick preview (200px, 10 samples)
-node examples/render.js --quick > output.ppm
-
-# Full render
-node examples/render.js --width=800 --samples=500 > output.ppm
-```
-
-### Tests
-```bash
-npm test  # 62 tests
+node examples/render.js --quick > output.ppm    # Preview
+node examples/render.js --width=800 --samples=500 > output.ppm  # Full
+npm test  # 149 tests
 ```
 
 ## Architecture
 
 ```
 src/
-  vec3.js       — 3D vector: positions, directions, colors (96 methods)
-  ray.js        — Ray: P(t) = origin + t × direction
-  hittable.js   — Hit record, HittableList container
-  sphere.js     — Ray-sphere intersection with bounding box
-  plane.js      — Plane, XYRect, XZRect, YZRect, Box primitives
-  triangle.js   — Möller-Trumbore triangle + Mesh (OBJ loader)
-  aabb.js       — Axis-Aligned Bounding Box (unrolled slab test)
-  bvh.js        — Bounding Volume Hierarchy tree
-  material.js   — Lambertian, Metal, Dielectric, DiffuseLight
-  texture.js    — Solid, Checker, Gradient, Noise, Marble
-  camera.js     — Configurable: position, FOV, DOF, aspect ratio
-  renderer.js   — Core loop: ray tracing + BVH + gamma correction
+  vec3.js         — 3D vector math (position, direction, color)
+  ray.js          — Ray with time parameter (motion blur)
+  hittable.js     — Hit record, HittableList
+  sphere.js       — Sphere with UV mapping + bounding box
+  moving-sphere.js — MovingSphere for motion blur
+  plane.js        — Plane, XYRect, XZRect, YZRect, Box
+  triangle.js     — Triangle (Möller-Trumbore), Mesh, OBJ loader
+  cylinder.js     — Disk, Cylinder, Cone
+  aabb.js         — Axis-Aligned Bounding Box (optimized slab test)
+  bvh.js          — Bounding Volume Hierarchy
+  material.js     — Lambertian, Metal, Dielectric, ColoredGlass, DiffuseLight
+  texture.js      — 8 procedural textures
+  camera.js       — Position, FOV, DOF, motion blur shutter
+  renderer.js     — Iterative ray tracing + BVH + progress bar
+  transform.js    — Translate, RotateY
+  volume.js       — Isotropic, ConstantMedium (volumetric fog)
+  csg.js          — Union, Intersection, Difference
+  environment.js  — SkyGradient, Sunset, Starfield, Solid
+  denoise.js      — Bilateral filter, box blur
+  tonemap.js      — Reinhard, ACES filmic, exposure
+  scene-format.js — JSON scene import/export
+  debug.js        — Normal map, depth map, BVH visualization
 
 web/
-  index.html    — Interactive demo with controls
-  bundle.js     — Browser bundle (all features)
-  worker.js     — Single-worker progressive renderer
-  tile-worker.js — Tile-based parallel worker
+  index.html      — Interactive demo (14 scenes, orbit, zoom, presets)
+  gallery.html    — Live-rendered gallery of all scenes
+  bundle.js       — Browser-compatible single-file bundle
+  tile-worker.js  — Multi-worker tile-based renderer
+  worker.js       — Single-worker progressive renderer
 
-test/
-  ray-tracer.test.js  — Vec3, Ray, Sphere, Materials, Camera, Renderer (27 tests)
-  bvh.test.js         — AABB, BVH correctness + performance (9 tests)
-  geometry.test.js     — Plane, XZRect, Box (9 tests)
-  triangle.test.js     — Triangle, Mesh, OBJ parsing (8 tests)
-  light.test.js        — DiffuseLight emissive material (3 tests)
-  texture.test.js      — Procedural textures (6 tests)
+test/  — 149 tests across 11 files
 ```
 
 ## Performance
 
-| Metric | Value |
-|--------|-------|
-| BVH speedup | 2.5x on 500 objects |
-| CLI render (random scene, 200px, 10 spp) | ~2 seconds |
-| CLI render (random scene, 400px, 100 spp) | ~25 seconds |
-| Multi-worker (4 cores) | ~3-4x faster than single-worker |
-
-## How It Works
-
-1. For each pixel, shoot rays from the camera into the scene
-2. BVH tree quickly finds the closest object intersection
-3. Based on material, scatter (reflect/refract) or emit light
-4. Recursively trace scattered rays up to max depth
-5. Average multiple samples per pixel for anti-aliasing
-6. Apply gamma correction (sqrt) for proper brightness
+| Optimization | Speedup |
+|-------------|---------|
+| BVH acceleration | 2.5x (500 objects) |
+| Iterative rayColor | 1.57x |
+| Multi-worker (4 cores) | ~3x |
+| AABB unrolled slab test | ~2x |
+| **Combined** | **~5-10x** |
 
 ## Built by
 
