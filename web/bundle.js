@@ -364,6 +364,30 @@ class MarbleTexture {
   }
 }
 
+class StripeTexture {
+  constructor(colors, scale = 10) { this.colors = colors; this.scale = scale; }
+  value(u, v, p) {
+    const t = (Math.sin(this.scale * p.y) + 1) * 0.5;
+    return this.colors[Math.floor(t * this.colors.length) % this.colors.length];
+  }
+}
+
+class PlanetTexture {
+  constructor(land, ocean, cloud, scale = 3) {
+    this.land = land; this.ocean = ocean; this.cloud = cloud; this.scale = scale;
+    this.noise = new NoiseTexture(null, 1);
+  }
+  value(u, v, p) {
+    const elev = this.noise._turbulence(p.mul(this.scale));
+    if (this.cloud) {
+      const cn = this.noise._noise(p.x*5+100, p.y*5, p.z*5);
+      if (cn > 0.55) return this.cloud;
+    }
+    if (elev > 0.5) return this.land.mul(0.6 + elev * 0.4);
+    return this.ocean.mul(0.7 + (0.5 - (0.5 - elev) * 2) * 0.3 + 0.3);
+  }
+}
+
 // ===== Materials =====
 class Lambertian {
   constructor(albedo) {
@@ -433,6 +457,44 @@ class Camera {
     const offset = this.u.mul(rd.x).add(this.v.mul(rd.y));
     return new Ray(this.origin.add(offset), this.lowerLeftCorner.add(this.horizontal.mul(s)).add(this.vertical.mul(t)).sub(this.origin).sub(offset));
   }
+}
+
+// ===== Volumetrics =====
+class Isotropic {
+  constructor(albedo) { this.albedo = albedo; }
+  scatter(rayIn, rec) {
+    return { scattered: new Ray(rec.p, Vec3.randomInUnitSphere()), attenuation: this.albedo };
+  }
+}
+
+class ConstantMedium {
+  constructor(boundary, density, color) {
+    this.boundary = boundary;
+    this.negInvDensity = -1.0 / density;
+    this.phaseFunction = new Isotropic(color);
+  }
+  hit(ray, tMin, tMax) {
+    const rec1 = this.boundary.hit(ray, -Infinity, Infinity);
+    if (!rec1) return null;
+    const rec2 = this.boundary.hit(ray, rec1.t + 0.0001, Infinity);
+    if (!rec2) return null;
+    if (rec1.t < tMin) rec1.t = tMin;
+    if (rec2.t > tMax) rec2.t = tMax;
+    if (rec1.t >= rec2.t) return null;
+    if (rec1.t < 0) rec1.t = 0;
+    const rayLength = ray.direction.length();
+    const distInside = (rec2.t - rec1.t) * rayLength;
+    const hitDist = this.negInvDensity * Math.log(Math.random());
+    if (hitDist > distInside) return null;
+    const rec = new HitRecord();
+    rec.t = rec1.t + hitDist / rayLength;
+    rec.p = ray.at(rec.t);
+    rec.normal = new Vec3(1, 0, 0);
+    rec.frontFace = true;
+    rec.material = this.phaseFunction;
+    return rec;
+  }
+  boundingBox() { return this.boundary.boundingBox(); }
 }
 
 // ===== Scenes =====
@@ -547,13 +609,69 @@ function createTexturedWorld() {
   return world;
 }
 
+function createSmokyCornell() {
+  const world = new HittableList();
+  const red   = new Lambertian(new Vec3(0.65, 0.05, 0.05));
+  const white = new Lambertian(new Vec3(0.73, 0.73, 0.73));
+  const green = new Lambertian(new Vec3(0.12, 0.45, 0.15));
+  const light = new DiffuseLight(new Vec3(7, 7, 7));
+
+  world.add(new YZRect(0, 555, 0, 555, 555, green));
+  world.add(new YZRect(0, 555, 0, 555, 0, red));
+  world.add(new XZRect(113, 443, 127, 432, 554, light));
+  world.add(new XZRect(0, 555, 0, 555, 0, white));
+  world.add(new XZRect(0, 555, 0, 555, 555, white));
+  world.add(new XYRect(0, 555, 0, 555, 555, white));
+
+  const box1 = new Translate(new RotateY(new Box(new Vec3(0,0,0), new Vec3(165,165,165), white), -18), new Vec3(130,0,65));
+  const box2 = new Translate(new RotateY(new Box(new Vec3(0,0,0), new Vec3(165,330,165), white), 15), new Vec3(265,0,295));
+
+  world.add(new ConstantMedium(box1, 0.01, new Vec3(1, 1, 1)));
+  world.add(new ConstantMedium(box2, 0.01, new Vec3(0, 0, 0)));
+
+  return world;
+}
+
+function createSolarSystem() {
+  const world = new HittableList();
+  // Star (emissive)
+  world.add(new Sphere(new Vec3(0, 0, 0), 3, new DiffuseLight(new Vec3(5, 4, 2))));
+  // Earth-like planet
+  world.add(new Sphere(new Vec3(8, 0, 0), 1.5, new Lambertian(
+    new PlanetTexture(new Vec3(0.2, 0.6, 0.15), new Vec3(0.1, 0.2, 0.7), new Vec3(0.95, 0.95, 0.95), 4)
+  )));
+  // Mars-like (red, rocky)
+  world.add(new Sphere(new Vec3(-6, 1, 5), 0.8, new Lambertian(
+    new NoiseTexture(new Vec3(0.8, 0.3, 0.1), 8)
+  )));
+  // Gas giant with stripes
+  world.add(new Sphere(new Vec3(4, -2, -10), 2.5, new Lambertian(
+    new StripeTexture([
+      new Vec3(0.8, 0.6, 0.3), new Vec3(0.9, 0.7, 0.4),
+      new Vec3(0.7, 0.5, 0.2), new Vec3(0.85, 0.65, 0.35),
+      new Vec3(0.6, 0.4, 0.2)
+    ], 6)
+  )));
+  // Moon (small, gray)
+  world.add(new Sphere(new Vec3(10, 0.8, 0.5), 0.3, new Lambertian(new Vec3(0.7, 0.7, 0.7))));
+  // Ice planet
+  world.add(new Sphere(new Vec3(-10, -1, -6), 1.2, new Lambertian(
+    new MarbleTexture(new Vec3(0.7, 0.8, 0.95), 3)
+  )));
+  // Metallic asteroid
+  world.add(new Sphere(new Vec3(3, 3, 4), 0.4, new Metal(new Vec3(0.6, 0.6, 0.6), 0.3)));
+  world.add(new Sphere(new Vec3(-4, -3, 3), 0.3, new Metal(new Vec3(0.5, 0.5, 0.5), 0.5)));
+  return world;
+}
+
 // ===== Expose to global =====
 if (typeof self !== 'undefined') {
   self.RayTracer = {
     Vec3, Ray, HitRecord, HittableList, AABB, BVHNode, Sphere, XZRect, XYRect, YZRect, Box, Translate, RotateY,
     SolidColor, CheckerTexture, NoiseTexture, MarbleTexture,
+    Isotropic, ConstantMedium,
     Lambertian, Metal, Dielectric, DiffuseLight, Camera,
     createRandomScene, createSimpleScene, createCornellBox,
-    createGlassStudy, createMetalShowcase, createLitRoom, createTexturedWorld
+    createGlassStudy, createMetalShowcase, createLitRoom, createTexturedWorld, createSmokyCornell, createSolarSystem
   };
 }
