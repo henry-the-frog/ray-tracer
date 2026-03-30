@@ -91,6 +91,7 @@
       <option value="textured">Textured World (marble + noise)</option>
       <option value="smoky">Smoky Cornell Box (volumetric)</option>
       <option value="solar">Solar System (procedural planets)</option>
+      <option value="showcase">✨ Showcase (everything combined)</option>
     </select>
   </div>
   <div class="control-group">
@@ -132,9 +133,10 @@
   </div>
 </div>
 
-<div class="canvas-wrap">
+<div class="canvas-wrap" id="canvasWrap">
   <canvas id="canvas" width="400" height="267"></canvas>
   <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+  <div id="dragHint" style="position:absolute;top:8px;right:8px;color:#484f58;font-size:0.7rem;pointer-events:none">🖱️ Drag to orbit</div>
 </div>
 
 <div class="stats">
@@ -195,6 +197,10 @@ const scenes = {
     lookFrom: { x: 20, y: 8, z: 15 }, lookAt: { x: 0, y: 0, z: 0 },
     vfov: 40, aperture: 0.2, focusDist: 20, aspectRatio: 3/2,
     background: { x: 0.01, y: 0.01, z: 0.02 }
+  },
+  showcase: {
+    lookFrom: { x: 10, y: 4, z: 10 }, lookAt: { x: 0, y: 1, z: 0 },
+    vfov: 30, aperture: 0.1, focusDist: 12, aspectRatio: 3/2
   },
   cornell: {
     lookFrom: { x: 278, y: 278, z: -800 }, lookAt: { x: 278, y: 278, z: 0 },
@@ -355,6 +361,43 @@ window.addEventListener('load', () => {
   document.getElementById('samples').value = '4';
   startRender();
   setTimeout(() => { document.getElementById('samples').value = '50'; }, 100);
+});
+
+// === Camera Orbit (mouse drag) ===
+let isDragging = false, lastX = 0, lastY = 0;
+let orbitTheta = 0, orbitPhi = 0;
+const cvs = document.getElementById('canvas');
+cvs.style.cursor = 'grab';
+
+cvs.addEventListener('mousedown', (e) => {
+  isDragging = true; lastX = e.clientX; lastY = e.clientY;
+  cvs.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  orbitTheta += (e.clientX - lastX) * 0.5;
+  orbitPhi = Math.max(-80, Math.min(80, orbitPhi - (e.clientY - lastY) * 0.5));
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener('mouseup', () => {
+  if (!isDragging) return;
+  isDragging = false; cvs.style.cursor = 'grab';
+  if (Math.abs(orbitTheta) < 2 && Math.abs(orbitPhi) < 2) { orbitTheta = 0; orbitPhi = 0; return; }
+  const scene = document.getElementById('scene').value;
+  const cam = scenes[scene];
+  const lf = cam.lookFrom, la = cam.lookAt;
+  const dx = lf.x - la.x, dy = lf.y - la.y, dz = lf.z - la.z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  const origT = Math.atan2(dz, dx), origP = Math.asin(Math.max(-1, Math.min(1, dy / dist)));
+  const newT = origT + orbitTheta * Math.PI / 180;
+  const newP = Math.max(-1.4, Math.min(1.4, origP + orbitPhi * Math.PI / 180));
+  cam.lookFrom = {
+    x: la.x + dist * Math.cos(newP) * Math.cos(newT),
+    y: la.y + dist * Math.sin(newP),
+    z: la.z + dist * Math.cos(newP) * Math.sin(newT)
+  };
+  orbitTheta = 0; orbitPhi = 0;
+  startRender();
 });
 </script>
 </body>

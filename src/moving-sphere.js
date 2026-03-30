@@ -1,18 +1,27 @@
-// sphere.js — Ray-sphere intersection
+// moving-sphere.js — Sphere that moves linearly between two centers over time [0,1]
 
-import { HitRecord } from './hittable.js';
 import { Vec3 } from './vec3.js';
+import { HitRecord } from './hittable.js';
 import { AABB } from './aabb.js';
 
-export class Sphere {
-  constructor(center, radius, material) {
-    this.center = center;
+export class MovingSphere {
+  constructor(center0, center1, time0, time1, radius, material) {
+    this.center0 = center0;
+    this.center1 = center1;
+    this.time0 = time0;
+    this.time1 = time1;
     this.radius = radius;
     this.material = material;
   }
 
+  center(time) {
+    const t = (time - this.time0) / (this.time1 - this.time0);
+    return this.center0.add(this.center1.sub(this.center0).mul(t));
+  }
+
   hit(ray, tMin, tMax) {
-    const oc = ray.origin.sub(this.center);
+    const currentCenter = this.center(ray.time);
+    const oc = ray.origin.sub(currentCenter);
     const a = ray.direction.lengthSquared();
     const halfB = oc.dot(ray.direction);
     const c = oc.lengthSquared() - this.radius * this.radius;
@@ -21,8 +30,6 @@ export class Sphere {
     if (discriminant < 0) return null;
 
     const sqrtd = Math.sqrt(discriminant);
-
-    // Find the nearest root in the acceptable range
     let root = (-halfB - sqrtd) / a;
     if (root <= tMin || root >= tMax) {
       root = (-halfB + sqrtd) / a;
@@ -32,23 +39,17 @@ export class Sphere {
     const rec = new HitRecord();
     rec.t = root;
     rec.p = ray.at(root);
-    const outwardNormal = rec.p.sub(this.center).div(this.radius);
+    const outwardNormal = rec.p.sub(currentCenter).div(this.radius);
     rec.setFaceNormal(ray, outwardNormal);
     rec.material = this.material;
-
-    // UV mapping: spherical coordinates
-    // u: [0, 1] longitude, v: [0, 1] latitude
-    const unitP = outwardNormal; // Already a unit vector (point - center / radius)
-    const theta = Math.acos(-unitP.y);
-    const phi = Math.atan2(-unitP.z, unitP.x) + Math.PI;
-    rec.u = phi / (2 * Math.PI);
-    rec.v = theta / Math.PI;
 
     return rec;
   }
 
   boundingBox() {
     const r = new Vec3(this.radius, this.radius, this.radius);
-    return new AABB(this.center.sub(r), this.center.add(r));
+    const box0 = new AABB(this.center0.sub(r), this.center0.add(r));
+    const box1 = new AABB(this.center1.sub(r), this.center1.add(r));
+    return AABB.surrounding(box0, box1);
   }
 }
