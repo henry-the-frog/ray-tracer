@@ -2,19 +2,23 @@
 
 import { Vec3, Color } from './vec3.js';
 import { Ray } from './ray.js';
+import { SolidColor } from './texture.js';
 
 // Lambertian (matte/diffuse)
 export class Lambertian {
   constructor(albedo) {
-    this.albedo = albedo; // Color
+    // Accept either a Color (Vec3) or a Texture
+    this.texture = albedo instanceof Vec3 ? new SolidColor(albedo) : albedo;
+    this.albedo = albedo instanceof Vec3 ? albedo : null; // backward compat
   }
 
   scatter(rayIn, rec) {
     let scatterDirection = rec.normal.add(Vec3.randomUnitVector());
     if (scatterDirection.nearZero()) scatterDirection = rec.normal;
+    const attenuation = this.texture.value(0, 0, rec.p);
     return {
       scattered: new Ray(rec.p, scatterDirection),
-      attenuation: this.albedo
+      attenuation
     };
   }
 }
@@ -69,5 +73,20 @@ export class Dielectric {
     let r0 = (1 - refIdx) / (1 + refIdx);
     r0 = r0 * r0;
     return r0 + (1 - r0) * Math.pow(1 - cosine, 5);
+  }
+}
+
+// Emissive (light source)
+export class DiffuseLight {
+  constructor(emit) {
+    this.emit = emit; // Color — intensity of emitted light
+  }
+
+  scatter(rayIn, rec) {
+    return null; // Lights don't scatter
+  }
+
+  emitted(u, v, p) {
+    return this.emit;
   }
 }

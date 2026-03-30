@@ -1,6 +1,7 @@
 // renderer.js — The core ray tracing loop
 
 import { Color, Vec3 } from './vec3.js';
+import { BVHNode } from './bvh.js';
 
 export class Renderer {
   constructor({
@@ -19,20 +20,32 @@ export class Renderer {
     this.camera = camera;
     this.world = world;
     this.background = background;
+
+    // Build BVH from world objects if world is a HittableList
+    if (world.objects && world.objects.length > 4) {
+      this.scene = new BVHNode([...world.objects]);
+    } else {
+      this.scene = world;
+    }
   }
 
   // Trace a single ray
   rayColor(ray, depth) {
     if (depth <= 0) return new Color(0, 0, 0);
 
-    const rec = this.world.hit(ray, 0.001, Infinity);
+    const rec = this.scene.hit(ray, 0.001, Infinity);
 
     if (rec) {
+      // Get emitted light from the material (if any)
+      const emitted = rec.material.emitted
+        ? rec.material.emitted(0, 0, rec.p)
+        : new Color(0, 0, 0);
+
       const result = rec.material.scatter(ray, rec);
       if (result) {
-        return this.rayColor(result.scattered, depth - 1).mul(result.attenuation);
+        return emitted.add(this.rayColor(result.scattered, depth - 1).mul(result.attenuation));
       }
-      return new Color(0, 0, 0);
+      return emitted;
     }
 
     // Sky gradient (background)
