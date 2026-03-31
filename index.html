@@ -345,6 +345,10 @@ function startRender() {
   for (let i = 0; i < numWorkers; i++) {
     const w = new Worker('tile-worker.js');
     w.onmessage = function(e) {
+      if (e.data.building) {
+        document.getElementById('status').textContent = `Building scene (${numWorkers} workers)...`;
+        return;
+      }
       const { tileId, x0, y0, tileW, tileH, pixels } = e.data;
       const imageData = new ImageData(pixels, tileW, tileH);
       ctx.putImageData(imageData, x0, y0);
@@ -396,6 +400,13 @@ function startRender() {
       }
     };
     workers.push(w);
+    w.onerror = function(err) {
+      console.error('Worker error:', err);
+      document.getElementById('status').textContent = 'Error: ' + (err.message || 'Worker crashed');
+      document.getElementById('renderBtn').textContent = '▶ Render';
+      document.getElementById('renderBtn').className = '';
+      document.getElementById('renderBtn').onclick = startRender;
+    };
     sendNextTile(w);
   }
 }
@@ -506,10 +517,16 @@ window.addEventListener('load', () => {
   const best = opts.reduce((a, b) => Math.abs(b - cores) < Math.abs(a - cores) ? b : a);
   sel.value = String(best);
 
-  // Auto-render with preview
-  document.getElementById('samples').value = '4';
+  // Auto-render with a quick preview, then restore quality settings
+  // Use 'simple' scene for initial preview (fast to build) before switching back
+  const savedScene = document.getElementById('scene').value;
+  document.getElementById('scene').value = 'simple';
+  document.getElementById('samples').value = '16';
   startRender();
-  setTimeout(() => { document.getElementById('samples').value = '50'; }, 100);
+  setTimeout(() => {
+    document.getElementById('scene').value = savedScene;
+    document.getElementById('samples').value = '50';
+  }, 100);
 });
 
 // === Camera Orbit (mouse drag) ===
