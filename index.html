@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ray Tracer — Henry</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  header {
+    padding: 1.5rem 2rem 1rem;
+    text-align: center;
+    width: 100%;
+    max-width: 900px;
+  }
+  h1 { font-size: 1.8rem; font-weight: 600; color: #f0f6fc; margin-bottom: 0.3rem; }
+  h1 span { color: #58a6ff; }
+  .subtitle { color: #8b949e; font-size: 0.9rem; }
+  .controls {
+    display: flex; gap: 1rem; padding: 1rem 2rem; flex-wrap: wrap;
+    justify-content: center; align-items: center; max-width: 900px;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 0.25rem; }
+  .control-group label {
+    font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  select, input[type=range] {
+    background: #161b22; border: 1px solid #30363d; color: #c9d1d9;
+    padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.85rem;
+  }
+  select:focus, input:focus { outline: none; border-color: #58a6ff; }
+  button {
+    background: #238636; color: #fff; border: none; padding: 0.5rem 1.5rem;
+    border-radius: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.2s;
+  }
+  button:hover { background: #2ea043; }
+  button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  button.stop { background: #da3633; }
+  button.stop:hover { background: #f85149; }
+  .canvas-wrap {
+    margin: 1rem; border: 1px solid #30363d; border-radius: 8px;
+    overflow: hidden; position: relative; background: #010409;
+  }
+  canvas { display: block; image-rendering: auto; }
+  .progress-bar {
+    position: absolute; bottom: 0; left: 0; height: 3px;
+    background: #58a6ff; transition: width 0.1s;
+  }
+  .stats {
+    display: flex; gap: 2rem; padding: 0.5rem 2rem; color: #8b949e;
+    font-size: 0.8rem; flex-wrap: wrap; justify-content: center;
+  }
+  .stats span { color: #c9d1d9; }
+  .info {
+    max-width: 700px; padding: 2rem; color: #8b949e;
+    font-size: 0.85rem; line-height: 1.6; text-align: center;
+  }
+  .info a { color: #58a6ff; text-decoration: none; }
+  .info a:hover { text-decoration: underline; }
+  @media (max-width: 600px) {
+    .controls { gap: 0.5rem; padding: 0.5rem; }
+    canvas { width: 100% !important; height: auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔮 <span>Ray Tracer</span></h1>
+  <p class="subtitle">Built from scratch in JavaScript — multi-threaded parallel rendering</p>
+</header>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Scene</label>
+    <select id="scene">
+      <option value="simple">Three Spheres</option>
+      <option value="random" selected>Random Scene (~480 spheres)</option>
+      <option value="cornell">Cornell Box</option>
+      <option value="glass">Glass Study</option>
+      <option value="metal">Metal Showcase</option>
+      <option value="lit">Lit Room (area light)</option>
+      <option value="textured">Textured World (marble + noise)</option>
+      <option value="smoky">Smoky Cornell Box (volumetric)</option>
+      <option value="solar">Solar System (procedural planets)</option>
+      <option value="showcase">✨ Showcase (everything combined)</option>
+      <option value="motion">Motion Blur (bouncing spheres)</option>
+      <option value="final">🏆 Final Scene (everything!)</option>
+      <option value="museum">🏛️ Museum (pedestals + colored glass)</option>
+      <option value="sunset">🌅 Sunset (warm gradient sky)</option>
+      <option value="preetham">☀️ Preetham Sky (physically-based)</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Preset</label>
+    <select id="preset" onchange="applyPreset()">
+      <option value="custom">Custom</option>
+      <option value="preview">Preview (fast)</option>
+      <option value="draft">Draft</option>
+      <option value="quality" selected>Quality</option>
+      <option value="production">Production (slow)</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Resolution</label>
+    <select id="resolution">
+      <option value="200">200px (fast)</option>
+      <option value="400" selected>400px</option>
+      <option value="600">600px</option>
+      <option value="800">800px</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Samples</label>
+    <select id="samples">
+      <option value="4">4 (preview)</option>
+      <option value="16">16 (fast)</option>
+      <option value="50" selected>50 (balanced)</option>
+      <option value="100">100 (quality)</option>
+      <option value="500">500 (high)</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Workers</label>
+    <select id="workers">
+      <option value="1">1 (single)</option>
+      <option value="2">2</option>
+      <option value="4" selected>4</option>
+      <option value="8">8</option>
+      <option value="16">16</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Mode</label>
+    <select id="renderMode">
+      <option value="normal" selected>Full Render</option>
+      <option value="normals">Normal Map</option>
+      <option value="depth">Depth Map</option>
+      <option value="flat">Flat Shading</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Denoise</label>
+    <select id="denoise">
+      <option value="off" selected>Off</option>
+      <option value="light">Light</option>
+      <option value="medium">Medium</option>
+      <option value="heavy">Heavy</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Tone Map</label>
+    <select id="tonemap">
+      <option value="off" selected>Off (gamma only)</option>
+      <option value="reinhard">Reinhard</option>
+      <option value="aces">ACES Filmic</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>&nbsp;</label>
+    <button id="renderBtn" onclick="startRender()">▶ Render</button>
+  </div>
+  <div class="control-group">
+    <label>&nbsp;</label>
+    <button id="downloadBtn" onclick="downloadPNG()" style="background:#1f6feb" disabled>💾 Save PNG</button>
+  </div>
+</div>
+
+<div class="canvas-wrap" id="canvasWrap">
+  <canvas id="canvas" width="400" height="267"></canvas>
+  <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+  <div id="dragHint" style="position:absolute;top:8px;right:8px;color:#484f58;font-size:0.7rem;pointer-events:none">🖱️ Drag to orbit</div>
+</div>
+
+<div class="stats">
+  <div>Status: <span id="status">Ready</span></div>
+  <div>Progress: <span id="progress">0%</span></div>
+  <div>Time: <span id="time">—</span></div>
+  <div>Rays: <span id="rays">—</span></div>
+  <div>Workers: <span id="workerCount">—</span></div>
+</div>
+
+<div class="info">
+  <p>
+    A complete ray tracer with diffuse, metallic, dielectric, emissive, and volumetric materials.
+    Features BVH acceleration, procedural textures, depth of field, and parallel rendering with Web Workers.
+  </p>
+  <p style="margin-top: 0.5rem">
+    Built by <a href="https://henry-the-frog.github.io">Henry</a> •
+    <a href="https://github.com/henry-the-frog/ray-tracer">Source on GitHub</a>
+  </p>
+</div>
+
+<script>
+let workers = [];
+let startTime = 0;
+
+const scenes = {
+  simple: {
+    lookFrom: { x: -2, y: 2, z: 1 }, lookAt: { x: 0, y: 0, z: -1 },
+    vfov: 20, aperture: 0, focusDist: 1, aspectRatio: 3/2
+  },
+  random: {
+    lookFrom: { x: 13, y: 2, z: 3 }, lookAt: { x: 0, y: 0, z: 0 },
+    vfov: 20, aperture: 0.1, focusDist: 10.0, aspectRatio: 3/2
+  },
+  glass: {
+    lookFrom: { x: 0, y: 0.5, z: 2 }, lookAt: { x: 0, y: 0, z: -1 },
+    vfov: 40, aperture: 0, focusDist: 1, aspectRatio: 3/2
+  },
+  metal: {
+    lookFrom: { x: 0, y: 2, z: 4 }, lookAt: { x: 0, y: 0.3, z: -1 },
+    vfov: 40, aperture: 0.05, focusDist: 5, aspectRatio: 3/2
+  },
+  lit: {
+    lookFrom: { x: 0, y: 2, z: 4 }, lookAt: { x: 0, y: 0, z: -1 },
+    vfov: 40, aperture: 0, focusDist: 1, aspectRatio: 3/2,
+    background: { x: 0, y: 0, z: 0 }
+  },
+  textured: {
+    lookFrom: { x: 5, y: 3, z: 6 }, lookAt: { x: 0, y: 0.5, z: 0 },
+    vfov: 30, aperture: 0.05, focusDist: 7, aspectRatio: 3/2
+  },
+  smoky: {
+    lookFrom: { x: 278, y: 278, z: -800 }, lookAt: { x: 278, y: 278, z: 0 },
+    vfov: 40, aperture: 0, focusDist: 1, aspectRatio: 1,
+    background: { x: 0, y: 0, z: 0 }
+  },
+  solar: {
+    lookFrom: { x: 20, y: 8, z: 15 }, lookAt: { x: 0, y: 0, z: 0 },
+    vfov: 40, aperture: 0.2, focusDist: 20, aspectRatio: 3/2,
+    background: { x: 0.01, y: 0.01, z: 0.02 }
+  },
+  showcase: {
+    lookFrom: { x: 10, y: 4, z: 10 }, lookAt: { x: 0, y: 1, z: 0 },
+    vfov: 30, aperture: 0.1, focusDist: 12, aspectRatio: 3/2
+  },
+  motion: {
+    lookFrom: { x: 8, y: 3, z: 8 }, lookAt: { x: 0, y: 0.5, z: 0 },
+    vfov: 25, aperture: 0.1, focusDist: 10, aspectRatio: 3/2,
+    time0: 0, time1: 1
+  },
+  'final': {
+    lookFrom: { x: 478, y: 278, z: -600 }, lookAt: { x: 278, y: 278, z: 0 },
+    vfov: 40, aperture: 0, focusDist: 1, aspectRatio: 1,
+    background: { x: 0, y: 0, z: 0 }, time0: 0, time1: 1
+  },
+  museum: {
+    lookFrom: { x: 0, y: 3, z: 7 }, lookAt: { x: 0, y: 1.5, z: -1 },
+    vfov: 35, aperture: 0.05, focusDist: 8, aspectRatio: 3/2
+  },
+  sunset: {
+    lookFrom: { x: -2, y: 2, z: 1 }, lookAt: { x: 0, y: 0, z: -1 },
+    vfov: 20, aperture: 0, focusDist: 1, aspectRatio: 3/2,
+    bgMode: 'sunset'
+  },
+  preetham: {
+    lookFrom: { x: 0, y: 3, z: 8 }, lookAt: { x: 0, y: 1, z: 0 },
+    vfov: 50, aperture: 0.05, focusDist: 8, aspectRatio: 3/2,
+    bgMode: 'preetham', skyHour: 10, skyTurbidity: 2.5
+  },
+  cornell: {
+    lookFrom: { x: 278, y: 278, z: -800 }, lookAt: { x: 278, y: 278, z: 0 },
+    vfov: 40, aperture: 0, focusDist: 1, aspectRatio: 1,
+    background: { x: 0, y: 0, z: 0 }
+  }
+};
+
+function startRender() {
+  stopRender();
+
+  const scene = document.getElementById('scene').value;
+  const width = parseInt(document.getElementById('resolution').value);
+  const spp = parseInt(document.getElementById('samples').value);
+  const numWorkers = parseInt(document.getElementById('workers').value);
+  const renderMode = document.getElementById('renderMode').value;
+  const camConfig = scenes[scene];
+  const height = Math.floor(width / camConfig.aspectRatio);
+
+  const canvas = document.getElementById('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = Math.min(width * (width <= 200 ? 2 : 1), 800) + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#010409';
+  ctx.fillRect(0, 0, width, height);
+
+  const workerCam = {
+    lookFrom: camConfig.lookFrom, lookAt: camConfig.lookAt,
+    vup: { x: 0, y: 1, z: 0 }, vfov: camConfig.vfov,
+    aspectRatio: camConfig.aspectRatio, aperture: camConfig.aperture,
+    focusDist: camConfig.focusDist,
+    time0: camConfig.time0 || 0, time1: camConfig.time1 || 0
+  };
+
+  const config = {
+    width, height, samplesPerPixel: spp, maxDepth: 50,
+    scene, cameraConfig: workerCam, background: camConfig.background || null,
+    renderMode, bgMode: camConfig.bgMode || null,
+    skyHour: camConfig.skyHour || 10, skyTurbidity: camConfig.skyTurbidity || 2.5
+  };
+
+  // Generate tiles (32px tiles for good parallelism)
+  const TILE_SIZE = 32;
+  const tiles = [];
+  let tileId = 0;
+  for (let y = 0; y < height; y += TILE_SIZE) {
+    for (let x = 0; x < width; x += TILE_SIZE) {
+      tiles.push({
+        tileId: tileId++,
+        x0: x, y0: y,
+        x1: Math.min(x + TILE_SIZE, width),
+        y1: Math.min(y + TILE_SIZE, height)
+      });
+    }
+  }
+
+  // Shuffle tiles for more even visual progress
+  for (let i = tiles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+  }
+
+  const totalTiles = tiles.length;
+  let completedTiles = 0;
+  let tileIndex = 0;
+
+  document.getElementById('renderBtn').textContent = '⏹ Stop';
+  document.getElementById('renderBtn').className = 'stop';
+  document.getElementById('renderBtn').onclick = stopRender;
+  document.getElementById('status').textContent = `Rendering (${numWorkers} workers)...`;
+  document.getElementById('workerCount').textContent = numWorkers;
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('downloadBtn').disabled = true;
+  startTime = performance.now();
+
+  function sendNextTile(worker) {
+    if (tileIndex < tiles.length) {
+      worker.postMessage({ tile: tiles[tileIndex++], config });
+    }
+  }
+
+  // Create worker pool
+  for (let i = 0; i < numWorkers; i++) {
+    const w = new Worker('tile-worker.js');
+    w.onmessage = function(e) {
+      if (e.data.building) {
+        document.getElementById('status').textContent = `Building scene (${numWorkers} workers)...`;
+        return;
+      }
+      const { tileId, x0, y0, tileW, tileH, pixels } = e.data;
+      const imageData = new ImageData(pixels, tileW, tileH);
+      ctx.putImageData(imageData, x0, y0);
+
+      completedTiles++;
+      const pct = Math.floor((completedTiles / totalTiles) * 100);
+      document.getElementById('progress').textContent = pct + '%';
+      document.getElementById('progressBar').style.width = pct + '%';
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+      document.getElementById('time').textContent = elapsed + 's';
+      const totalRays = Math.floor((completedTiles / totalTiles) * width * height * spp);
+      document.getElementById('rays').textContent = formatNumber(totalRays);
+
+      if (completedTiles === totalTiles) {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+        document.getElementById('status').textContent = `Complete (${numWorkers} workers)`;
+        document.getElementById('time').textContent = elapsed + 's';
+        document.getElementById('rays').textContent = formatNumber(width * height * spp);
+        document.getElementById('renderBtn').textContent = '▶ Render';
+        document.getElementById('renderBtn').className = '';
+        document.getElementById('renderBtn').onclick = startRender;
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('downloadBtn').disabled = false;
+
+        // Apply denoising if selected
+        const denoiseMode = document.getElementById('denoise').value;
+        if (denoiseMode !== 'off') {
+          document.getElementById('status').textContent = 'Denoising...';
+          const imgData = ctx.getImageData(0, 0, width, height);
+          const params = { light: [2, 15], medium: [3, 25], heavy: [4, 40] };
+          const [ss, cs] = params[denoiseMode];
+          const denoised = denoise(imgData.data, width, height, ss, cs);
+          ctx.putImageData(new ImageData(denoised, width, height), 0, 0);
+          document.getElementById('status').textContent = `Complete (denoised)`;
+        }
+
+        // Apply tone mapping
+        const tmMode = document.getElementById('tonemap').value;
+        if (tmMode !== 'off') {
+          const imgData2 = ctx.getImageData(0, 0, width, height);
+          const mapped = tmMode === 'aces' ? toneMapACES(imgData2.data, width, height) : toneMapReinhard(imgData2.data, width, height);
+          ctx.putImageData(new ImageData(mapped, width, height), 0, 0);
+        }
+
+        workers.forEach(w => w.terminate());
+        workers = [];
+      } else {
+        sendNextTile(w);
+      }
+    };
+    workers.push(w);
+    w.onerror = function(err) {
+      console.error('Worker error:', err);
+      document.getElementById('status').textContent = 'Error: ' + (err.message || 'Worker crashed');
+      document.getElementById('renderBtn').textContent = '▶ Render';
+      document.getElementById('renderBtn').className = '';
+      document.getElementById('renderBtn').onclick = startRender;
+    };
+    sendNextTile(w);
+  }
+}
+
+function stopRender() {
+  workers.forEach(w => w.terminate());
+  workers = [];
+  document.getElementById('status').textContent = 'Stopped';
+  document.getElementById('renderBtn').textContent = '▶ Render';
+  document.getElementById('renderBtn').className = '';
+  document.getElementById('renderBtn').onclick = startRender;
+}
+
+// Tone mapping
+function toneMapReinhard(pixels, w, h) {
+  const out = new Uint8ClampedArray(pixels.length);
+  for (let i = 0; i < pixels.length; i += 4) {
+    let r = (pixels[i]/255)**2, g = (pixels[i+1]/255)**2, b = (pixels[i+2]/255)**2;
+    r = r/(1+r); g = g/(1+g); b = b/(1+b);
+    out[i]=Math.round(Math.sqrt(r)*255);out[i+1]=Math.round(Math.sqrt(g)*255);out[i+2]=Math.round(Math.sqrt(b)*255);out[i+3]=255;
+  }
+  return out;
+}
+function toneMapACES(pixels, w, h) {
+  const out = new Uint8ClampedArray(pixels.length);
+  const a=2.51,b=0.03,c=2.43,d=0.59,e=0.14;
+  for (let i = 0; i < pixels.length; i += 4) {
+    let r = (pixels[i]/255)**2, g = (pixels[i+1]/255)**2, bl = (pixels[i+2]/255)**2;
+    r=Math.max(0,Math.min(1,(r*(a*r+b))/(r*(c*r+d)+e)));
+    g=Math.max(0,Math.min(1,(g*(a*g+b))/(g*(c*g+d)+e)));
+    bl=Math.max(0,Math.min(1,(bl*(a*bl+b))/(bl*(c*bl+d)+e)));
+    out[i]=Math.round(Math.sqrt(r)*255);out[i+1]=Math.round(Math.sqrt(g)*255);out[i+2]=Math.round(Math.sqrt(bl)*255);out[i+3]=255;
+  }
+  return out;
+}
+
+// Render presets
+function applyPreset() {
+  const p = document.getElementById('preset').value;
+  if (p === 'custom') return;
+  const presets = {
+    preview: { resolution: '200', samples: '4', denoise: 'off' },
+    draft: { resolution: '400', samples: '16', denoise: 'light' },
+    quality: { resolution: '400', samples: '50', denoise: 'off' },
+    production: { resolution: '800', samples: '500', denoise: 'light' },
+  };
+  const s = presets[p];
+  if (s) {
+    document.getElementById('resolution').value = s.resolution;
+    document.getElementById('samples').value = s.samples;
+    document.getElementById('denoise').value = s.denoise;
+  }
+}
+
+// Bilateral filter denoiser
+function denoise(pixels, w, h, spatialSigma, colorSigma) {
+  const out = new Uint8ClampedArray(pixels.length);
+  const r = Math.ceil(spatialSigma * 2);
+  const sd = 2 * spatialSigma * spatialSigma;
+  const cd = 2 * colorSigma * colorSigma;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y*w+x)*4;
+    const cr=pixels[i],cg=pixels[i+1],cb=pixels[i+2];
+    let sr=0,sg=0,sb=0,sw=0;
+    for (let dy=-r;dy<=r;dy++) for (let dx=-r;dx<=r;dx++) {
+      const nx=x+dx,ny=y+dy;
+      if(nx<0||nx>=w||ny<0||ny>=h)continue;
+      const ni=(ny*w+nx)*4;
+      const nr=pixels[ni],ng=pixels[ni+1],nb=pixels[ni+2];
+      const swt=Math.exp(-(dx*dx+dy*dy)/sd);
+      const cwt=Math.exp(-((cr-nr)**2+(cg-ng)**2+(cb-nb)**2)/cd);
+      const wt=swt*cwt;
+      sr+=nr*wt;sg+=ng*wt;sb+=nb*wt;sw+=wt;
+    }
+    out[i]=Math.round(sr/sw);out[i+1]=Math.round(sg/sw);out[i+2]=Math.round(sb/sw);out[i+3]=255;
+  }
+  return out;
+}
+
+function downloadPNG() {
+  const canvas = document.getElementById('canvas');
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const scene = document.getElementById('scene').value;
+    const res = document.getElementById('resolution').value;
+    const spp = document.getElementById('samples').value;
+    a.download = `ray-trace-${scene}-${res}px-${spp}spp.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+function formatNumber(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+
+// Detect core count and set default
+window.addEventListener('load', () => {
+  const cores = navigator.hardwareConcurrency || 4;
+  const sel = document.getElementById('workers');
+  // Set to closest option
+  const opts = [1, 2, 4, 8, 16];
+  const best = opts.reduce((a, b) => Math.abs(b - cores) < Math.abs(a - cores) ? b : a);
+  sel.value = String(best);
+
+  // Auto-render with a quick preview, then restore quality settings
+  // Use 'simple' scene for initial preview (fast to build) before switching back
+  const savedScene = document.getElementById('scene').value;
+  document.getElementById('scene').value = 'simple';
+  document.getElementById('samples').value = '16';
+  startRender();
+  setTimeout(() => {
+    document.getElementById('scene').value = savedScene;
+    document.getElementById('samples').value = '50';
+  }, 100);
+});
+
+// === Camera Orbit (mouse drag) ===
+let isDragging = false, lastX = 0, lastY = 0;
+let orbitTheta = 0, orbitPhi = 0;
+const cvs = document.getElementById('canvas');
+cvs.style.cursor = 'grab';
+
+// Scroll to zoom
+cvs.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const scene = document.getElementById('scene').value;
+  const cam = scenes[scene];
+  const lf = cam.lookFrom, la = cam.lookAt;
+  const dx = lf.x - la.x, dy = lf.y - la.y, dz = lf.z - la.z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  const factor = e.deltaY > 0 ? 1.1 : 0.9;
+  const newDist = Math.max(1, Math.min(200, dist * factor));
+  const scale = newDist / dist;
+  cam.lookFrom = { x: la.x + dx * scale, y: la.y + dy * scale, z: la.z + dz * scale };
+  startRender();
+}, { passive: false });
+
+cvs.addEventListener('mousedown', (e) => {
+  isDragging = true; lastX = e.clientX; lastY = e.clientY;
+  cvs.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  orbitTheta += (e.clientX - lastX) * 0.5;
+  orbitPhi = Math.max(-80, Math.min(80, orbitPhi - (e.clientY - lastY) * 0.5));
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener('mouseup', () => {
+  if (!isDragging) return;
+  isDragging = false; cvs.style.cursor = 'grab';
+  if (Math.abs(orbitTheta) < 2 && Math.abs(orbitPhi) < 2) { orbitTheta = 0; orbitPhi = 0; return; }
+  const scene = document.getElementById('scene').value;
+  const cam = scenes[scene];
+  const lf = cam.lookFrom, la = cam.lookAt;
+  const dx = lf.x - la.x, dy = lf.y - la.y, dz = lf.z - la.z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  const origT = Math.atan2(dz, dx), origP = Math.asin(Math.max(-1, Math.min(1, dy / dist)));
+  const newT = origT + orbitTheta * Math.PI / 180;
+  const newP = Math.max(-1.4, Math.min(1.4, origP + orbitPhi * Math.PI / 180));
+  cam.lookFrom = {
+    x: la.x + dist * Math.cos(newP) * Math.cos(newT),
+    y: la.y + dist * Math.sin(newP),
+    z: la.z + dist * Math.cos(newP) * Math.sin(newT)
+  };
+  orbitTheta = 0; orbitPhi = 0;
+  startRender();
+});
+</script>
+</body>
+</html>
