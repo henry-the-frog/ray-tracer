@@ -30,3 +30,4 @@ export { CosinePDF, HittablePDF, MixturePDF, MultiLightPDF } from './pdf.js';
 export { cosineWeightedHemisphere, cosineWeightedPDF, uniformHemisphere, uniformHemispherePDF, buildONB, powerHeuristic } from './sampling.js';
 export { wavelengthToRGB, cauchyIOR, abbeToCAuchy, randomWavelength, GLASS_TYPES, WAVELENGTH_MIN, WAVELENGTH_MAX } from './spectral.js';
 export { DispersiveGlass, crownGlass, flintGlass, heavyFlintGlass, diamond, prismGlass } from './dispersion.js';
+export { SubsurfaceScattering, skin, marble, wax, jade, milk } from './sss.js';
