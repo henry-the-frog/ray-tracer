@@ -32,3 +32,4 @@ export { wavelengthToRGB, cauchyIOR, abbeToCAuchy, randomWavelength, GLASS_TYPES
 export { DispersiveGlass, crownGlass, flintGlass, heavyFlintGlass, diamond, prismGlass } from './dispersion.js';
 export { SubsurfaceScattering, skin, marble, wax, jade, milk } from './sss.js';
 export { ExponentialFog, HeightFog, AtmosphericScattering } from './atmosphere.js';
+export { Torus, solveQuartic, solveCubic, solveQuadratic } from './torus.js';
