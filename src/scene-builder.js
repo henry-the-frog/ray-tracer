@@ -17,7 +17,7 @@ import { Torus } from './torus.js';
 import { XZRect, Box } from './plane.js';
 import { Cylinder, Cone, Disk } from './cylinder.js';
 import { Lambertian, Metal, Dielectric, DiffuseLight } from './material.js';
-import { CheckerTexture, SolidColor } from './texture.js';
+import { CheckerTexture, SolidColor, NoiseTexture, MarbleTexture, WoodTexture, StripeTexture } from './texture.js';
 import { DispersiveGlass, flintGlass, heavyFlintGlass, diamond as diamondMat } from './dispersion.js';
 import { SubsurfaceScattering, skin, marble, wax, jade, milk } from './sss.js';
 import { MicrofacetMaterial } from './microfacet.js';
@@ -78,6 +78,31 @@ class PendingObject {
 
   checker(color1, color2, scale = 2) {
     const tex = new CheckerTexture(
+      new SolidColor(toColor(color1)),
+      new SolidColor(toColor(color2)),
+      scale
+    );
+    this._builder._objects.push(this._create(new Lambertian(tex)));
+    return this._builder;
+  }
+
+  noise(scale = 4) {
+    this._builder._objects.push(this._create(new Lambertian(new NoiseTexture(scale))));
+    return this._builder;
+  }
+
+  marble(scale = 4) {
+    this._builder._objects.push(this._create(new Lambertian(new MarbleTexture(scale))));
+    return this._builder;
+  }
+
+  wood(scale = 1) {
+    this._builder._objects.push(this._create(new Lambertian(new WoodTexture(scale))));
+    return this._builder;
+  }
+
+  stripe(color1, color2, scale = 1) {
+    const tex = new StripeTexture(
       new SolidColor(toColor(color1)),
       new SolidColor(toColor(color2)),
       scale
