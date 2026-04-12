@@ -123,4 +123,42 @@ describe('SceneBuilder', () => {
     const pixels = renderer.render();
     assert.ok(pixels.length > 0);
   });
+
+  it('should support box primitive', () => {
+    const scene = new SceneBuilder()
+      .box([-1, 0, -2], [1, 2, 0]).lambertian([0.8, 0.2, 0.2]);
+    const world = scene.getWorld();
+    assert.equal(world.objects.length, 1);
+  });
+
+  it('should support cylinder primitive', () => {
+    const scene = new SceneBuilder()
+      .cylinder([0, 0, -2], 0.5, 2).metal([0.8, 0.8, 0.2], 0.1);
+    const world = scene.getWorld();
+    assert.equal(world.objects.length, 1);
+  });
+
+  it('should support movingSphere (motion blur)', () => {
+    const renderer = new SceneBuilder()
+      .movingSphere([0, 0, -2], [0, 1, -2], 0.5).lambertian([0.5, 0.5, 0.8])
+      .camera([0, 0, 0], [0, 0, -1])
+      .build({ width: 10, height: 5, samples: 2 });
+    const pixels = renderer.render();
+    assert.ok(pixels.length > 0);
+  });
+
+  it('should render all primitives together', () => {
+    const renderer = new SceneBuilder()
+      .sphere([0, 1, 0], 1).metal([0.8, 0.8, 0.2], 0.1)
+      .box([-3, 0, -2], [-1, 2, 0]).lambertian([0.8, 0.2, 0.2])
+      .cylinder([3, 0, -2], 0.5, 2).glass(1.5)
+      .torus([0, 0.5, -4], 1.5, 0.4).sss('marble')
+      .ground().checker([0.1, 0.1, 0.1], [0.9, 0.9, 0.9])
+      .light([0, 8, 0], 2)
+      .camera([0, 3, 5], [0, 1, -1], { fov: 45 })
+      .build({ width: 10, height: 5, samples: 2 });
+    
+    const pixels = renderer.render();
+    assert.ok(pixels.length > 0);
+  });
 });

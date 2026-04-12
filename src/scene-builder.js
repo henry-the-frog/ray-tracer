@@ -14,7 +14,8 @@
 import { Vec3, Color, Point3 } from './vec3.js';
 import { Sphere } from './sphere.js';
 import { Torus } from './torus.js';
-import { XZRect } from './plane.js';
+import { XZRect, Box } from './plane.js';
+import { Cylinder, Cone, Disk } from './cylinder.js';
 import { Lambertian, Metal, Dielectric, DiffuseLight } from './material.js';
 import { CheckerTexture, SolidColor } from './texture.js';
 import { DispersiveGlass, flintGlass, heavyFlintGlass, diamond as diamondMat } from './dispersion.js';
@@ -22,6 +23,7 @@ import { SubsurfaceScattering, skin, marble, wax, jade, milk } from './sss.js';
 import { Camera } from './camera.js';
 import { Renderer } from './renderer.js';
 import { HittableList } from './hittable.js';
+import { MovingSphere } from './moving-sphere.js';
 
 function toVec3(arr) {
   if (arr instanceof Vec3) return arr;
@@ -103,6 +105,24 @@ export class SceneBuilder {
 
   torus(center, majorRadius, minorRadius) {
     return new PendingObject(this, mat => new Torus(toVec3(center), majorRadius, minorRadius, mat));
+  }
+
+  box(min, max) {
+    return new PendingObject(this, mat => new Box(toVec3(min), toVec3(max), mat));
+  }
+
+  cylinder(center, radius, height) {
+    const c = toVec3(center);
+    return new PendingObject(this, mat => new Cylinder(c, radius, c.y, c.y + height, mat));
+  }
+
+  cone(tip, radius, height) {
+    const t = toVec3(tip);
+    return new PendingObject(this, mat => new Cone(t, radius, height, mat));
+  }
+
+  movingSphere(center0, center1, radius, time0 = 0, time1 = 1) {
+    return new PendingObject(this, mat => new MovingSphere(toVec3(center0), toVec3(center1), time0, time1, radius, mat));
   }
 
   ground(y = 0, extent = 100) {
