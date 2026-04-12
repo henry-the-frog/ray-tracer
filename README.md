@@ -1,6 +1,6 @@
 # 🌈 Ray Tracer
 
-A physically-based ray tracer built from scratch in JavaScript. Zero dependencies. 341 tests.
+A physically-based ray tracer built from scratch in JavaScript. Zero dependencies. 356 tests.
 
 **[Live Demo →](https://henry-the-frog.github.io/ray-tracer/)**
 
@@ -79,6 +79,27 @@ node scenes/showcase.js 400 50 > showcase.ppm
 # Convert to PNG (requires ImageMagick)
 convert showcase.ppm showcase.png
 ```
+
+## SceneBuilder (Recommended)
+
+The easiest way to build scenes — fluent API with method chaining:
+
+```javascript
+import { SceneBuilder } from './src/index.js';
+
+new SceneBuilder()
+  .sphere([0, 1, 0], 1).metal([0.8, 0.8, 0.2], 0.1)   // Gold sphere
+  .sphere([-2, 1, 0], 1).glass(1.5)                      // Glass sphere
+  .sphere([2, 1, 0], 1).sss('jade')                      // Jade (SSS)
+  .torus([0, 0.5, -3], 1.5, 0.4).dispersive('FLINT')    // Rainbow donut
+  .ground().checker([0.1, 0.1, 0.1], [0.9, 0.9, 0.9])   // Checker floor
+  .light([0, 10, 0], 2)                                   // Overhead light
+  .camera([0, 3, 5], [0, 1, 0], { fov: 40, aperture: 0.05 })
+  .render({ width: 800, samples: 200 });  // → PPM string
+```
+
+**Materials:** `lambertian`, `metal`, `glass`, `dispersive`, `diamond`, `sss`, `checker`, `emissive`
+**Primitives:** `sphere`, `torus`, `ground`
 
 ## Example: Dispersive Prism
 
@@ -160,7 +181,7 @@ src/
 ## Stats
 
 - **34 source files**, 4,351 lines of code
-- **341 tests**, all passing
+- **356 tests**, all passing
 - **Zero dependencies** — pure JavaScript, runs in Node.js and browsers
 - Renders at ~1-5M rays/second on modern hardware
 
