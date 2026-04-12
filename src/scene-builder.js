@@ -20,6 +20,8 @@ import { Lambertian, Metal, Dielectric, DiffuseLight } from './material.js';
 import { CheckerTexture, SolidColor } from './texture.js';
 import { DispersiveGlass, flintGlass, heavyFlintGlass, diamond as diamondMat } from './dispersion.js';
 import { SubsurfaceScattering, skin, marble, wax, jade, milk } from './sss.js';
+import { MicrofacetMaterial } from './microfacet.js';
+import { CSGUnion, CSGIntersection, CSGDifference } from './csg.js';
 import { Camera } from './camera.js';
 import { Renderer } from './renderer.js';
 import { HittableList } from './hittable.js';
@@ -89,6 +91,16 @@ class PendingObject {
     this._builder._objects.push(this._create(new DiffuseLight(c.mul(intensity))));
     return this._builder;
   }
+
+  // PBR microfacet material
+  pbr(color, roughness = 0.3, metallic = 0) {
+    this._builder._objects.push(this._create(new MicrofacetMaterial({
+      albedo: toColor(color),
+      roughness,
+      metallic,
+    })));
+    return this._builder;
+  }
 }
 
 export class SceneBuilder {
@@ -132,6 +144,31 @@ export class SceneBuilder {
   // Convenience: sphere light
   light(center, radius, color = [3, 3, 3]) {
     this._objects.push(new Sphere(toVec3(center), radius, new DiffuseLight(toColor(color))));
+    return this;
+  }
+
+  // CSG operations (work on the last two objects)
+  csgUnion() {
+    if (this._objects.length < 2) return this;
+    const b = this._objects.pop();
+    const a = this._objects.pop();
+    this._objects.push(new CSGUnion(a, b));
+    return this;
+  }
+
+  csgIntersect() {
+    if (this._objects.length < 2) return this;
+    const b = this._objects.pop();
+    const a = this._objects.pop();
+    this._objects.push(new CSGIntersection(a, b));
+    return this;
+  }
+
+  csgSubtract() {
+    if (this._objects.length < 2) return this;
+    const b = this._objects.pop();
+    const a = this._objects.pop();
+    this._objects.push(new CSGDifference(a, b));
     return this;
   }
 
