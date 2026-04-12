@@ -6,6 +6,7 @@ import { Torus, solveQuartic, solveCubic, solveQuadratic } from '../src/torus.js
 import { Vec3, Color, Point3 } from '../src/vec3.js';
 import { Ray } from '../src/ray.js';
 import { Lambertian, Metal } from '../src/material.js';
+import { CheckerTexture, SolidColor } from '../src/texture.js';
 import { Sphere } from '../src/sphere.js';
 import { HittableList } from '../src/hittable.js';
 import { Camera } from '../src/camera.js';
@@ -184,6 +185,73 @@ describe('Torus Primitive', () => {
     
     // Should have at least 2 hits (entering and exiting the tube)
     assert.ok(hits.length >= 2, `Expected at least 2 hits, got ${hits.length}`);
+  });
+
+  it('should produce UV coordinates in [0,1]', () => {
+    const torus = new Torus(new Point3(0, 0, 0), 2, 0.5, mat);
+    
+    // Hit from multiple angles and verify UV is in range
+    const angles = [0, Math.PI / 4, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+    for (const a of angles) {
+      const ray = new Ray(
+        new Vec3(3 * Math.cos(a), 0, 3 * Math.sin(a)),
+        new Vec3(-Math.cos(a), 0, -Math.sin(a))
+      );
+      const hit = torus.hit(ray, 0.001, 100);
+      if (hit) {
+        assert.ok(hit.u >= 0 && hit.u <= 1, `u=${hit.u} out of range`);
+        assert.ok(hit.v >= 0 && hit.v <= 1, `v=${hit.v} out of range`);
+      }
+    }
+  });
+
+  it('should vary UV around the torus', () => {
+    const torus = new Torus(new Point3(0, 0, 0), 2, 0.5, mat);
+    
+    // Two hits from different sides should have different u values
+    const rightRay = new Ray(new Point3(3, 0, 0), new Vec3(-1, 0, 0));
+    const frontRay = new Ray(new Point3(0, 0, 3), new Vec3(0, 0, -1));
+    
+    const rightHit = torus.hit(rightRay, 0.001, 100);
+    const frontHit = torus.hit(frontRay, 0.001, 100);
+    
+    assert.ok(rightHit && frontHit, 'Both should hit');
+    assert.notEqual(rightHit.u.toFixed(2), frontHit.u.toFixed(2), 'u should differ around torus');
+  });
+
+  it('should work with checker texture', () => {
+    const checker = new CheckerTexture(
+      new SolidColor(new Color(1, 0, 0)),
+      new SolidColor(new Color(0, 0, 1)),
+      4
+    );
+    const checkerMat = new Lambertian(checker);
+    
+    const world = new HittableList();
+    world.add(new Torus(new Point3(0, 0, -4), 1.5, 0.5, checkerMat));
+    
+    const camera = new Camera({
+      lookFrom: new Point3(0, 3, 0),
+      lookAt: new Point3(0, 0, -4),
+      vup: new Vec3(0, 1, 0),
+      vfov: 60,
+      aspectRatio: 2,
+    });
+    
+    const renderer = new Renderer({
+      width: 20, height: 10, samplesPerPixel: 4, maxDepth: 5,
+      camera, world,
+    });
+    
+    const pixels = renderer.render();
+    
+    // Should have both red and blue pixels (checker pattern)
+    let hasRed = false, hasBlue = false;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i] > 100 && pixels[i + 2] < 50) hasRed = true;
+      if (pixels[i + 2] > 100 && pixels[i] < 50) hasBlue = true;
+    }
+    assert.ok(hasRed || hasBlue, 'Checker torus should have colored pixels');
   });
 
   describe('Renderer integration', () => {

@@ -199,6 +199,7 @@ export class Torus {
       if (t >= tMin && t <= tMax) {
         const p = ray.origin.add(dir.mul(t));
         const normal = this._normalAt(p);
+        const [u, v] = this._uvAt(p);
         const frontFace = dir.dot(normal) < 0;
         
         return {
@@ -207,8 +208,8 @@ export class Torus {
           normal: frontFace ? normal : normal.negate(),
           frontFace,
           material: this.material,
-          u: 0, // UV mapping TODO
-          v: 0
+          u,
+          v
         };
       }
     }
@@ -254,6 +255,27 @@ export class Torus {
       local.y - ringPoint.y,
       local.z - ringPoint.z
     ).unit();
+  }
+
+  _uvAt(p) {
+    // UV coordinates for a torus:
+    // u = angle around the major circle (0 to 1)
+    // v = angle around the tube cross-section (0 to 1)
+    const local = p.sub(this.center);
+    const x = local.x, y = local.y, z = local.z;
+    
+    // u: angle in xz-plane around the major circle
+    const u = (Math.atan2(z, x) + Math.PI) / (2 * Math.PI);
+    
+    // v: angle around the tube
+    // Project point onto the ring to find the tube center
+    const distXZ = Math.sqrt(x * x + z * z);
+    // Local coordinates relative to ring point
+    const tubeX = distXZ - this.R; // radial distance from ring
+    const tubeY = y;               // height relative to ring
+    const v = (Math.atan2(tubeY, tubeX) + Math.PI) / (2 * Math.PI);
+    
+    return [u, v];
   }
 
   boundingBox() {
