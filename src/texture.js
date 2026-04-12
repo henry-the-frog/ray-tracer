@@ -259,3 +259,36 @@ export class PlanetTexture {
   }
 }
 
+
+// Mix two textures based on a blend factor (0 = tex1, 1 = tex2)
+export class MixTexture {
+  constructor(tex1, tex2, factor = 0.5) {
+    this.tex1 = tex1;
+    this.tex2 = tex2;
+    this.factor = typeof factor === 'number' ? factor : factor; // Can be a texture too
+  }
+  value(u, v, p) {
+    const f = typeof this.factor === 'number' ? this.factor : 
+              this.factor.value(u, v, p).x; // Use first channel as factor
+    const c1 = this.tex1.value(u, v, p);
+    const c2 = this.tex2.value(u, v, p);
+    return new Color(
+      c1.x * (1 - f) + c2.x * f,
+      c1.y * (1 - f) + c2.y * f,
+      c1.z * (1 - f) + c2.z * f
+    );
+  }
+}
+
+// Multiply two textures (useful for tinting)
+export class MultiplyTexture {
+  constructor(tex1, tex2) {
+    this.tex1 = tex1;
+    this.tex2 = tex2;
+  }
+  value(u, v, p) {
+    const c1 = this.tex1.value(u, v, p);
+    const c2 = this.tex2.value(u, v, p);
+    return new Color(c1.x * c2.x, c1.y * c2.y, c1.z * c2.z);
+  }
+}
