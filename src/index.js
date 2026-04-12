@@ -33,3 +33,4 @@ export { DispersiveGlass, crownGlass, flintGlass, heavyFlintGlass, diamond, pris
 export { SubsurfaceScattering, skin, marble, wax, jade, milk } from './sss.js';
 export { ExponentialFog, HeightFog, AtmosphericScattering } from './atmosphere.js';
 export { Torus, solveQuartic, solveCubic, solveQuadratic } from './torus.js';
+export { SceneBuilder } from './scene-builder.js';
